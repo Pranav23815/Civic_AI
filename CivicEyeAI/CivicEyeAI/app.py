@@ -2,80 +2,38 @@ import streamlit as st
 from ultralytics import YOLO
 import cv2
 import numpy as np
+from agent.brain import agent_decision
 
-# -------------------------
-# LOAD MODEL (ABSOLUTE PATH)
-# -------------------------
-
-MODEL_PATH = r"D:\uDDDDD\civic_eye_project\CivicEyeAI\CivicEyeAI\model\best.pt"
+MODEL_PATH = "model/best.pt"
 model = YOLO(MODEL_PATH)
 
-# -------------------------
-# STREAMLIT UI
-# -------------------------
-
-st.set_page_config(page_title="Civic-Eye AI", layout="centered")
-
+st.set_page_config(page_title="Civic-Eye AI")
 st.title("🚧 Civic-Eye AI – Smart City Auto Inspector")
 
-issue_type = st.selectbox(
-    "Select Issue Type",
-    ["Pothole", "Garbage", "Streetlight"]
-)
-
-uploaded = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
-
-# -------------------------
-# AGENT DECISION LOGIC
-# -------------------------
-
-def agent_decision(issue, detections):
-
-    base_cost = {
-        "Pothole": 1500,
-        "Garbage": 800,
-        "Streetlight": 2000
-    }
-
-    cost = base_cost[issue] * detections
-
-    if detections <= 2:
-        priority = "Low"
-    elif detections <= 5:
-        priority = "Medium"
-    else:
-        priority = "High"
-
-    return {
-        "issue_type": issue,
-        "detections": detections,
-        "estimated_cost": f"₹{cost}",
-        "priority": priority,
-        "action": "Auto Work Order Generated"
-    }
-
-# -------------------------
-# MAIN PIPELINE
-# -------------------------
+uploaded = st.file_uploader("Upload Image", type=["jpg","png","jpeg"])
 
 if uploaded:
-    try:
-        file_bytes = np.asarray(bytearray(uploaded.read()), dtype=np.uint8)
-        img = cv2.imdecode(file_bytes, 1)
 
-        st.image(img, caption="Uploaded Image")
+    bytes_data = uploaded.read()
+    np_img = np.frombuffer(bytes_data, np.uint8)
+    img = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
 
-        results = model(img)[0]
-        annotated = results.plot()
+    st.image(img, caption="Uploaded Image")
 
-        st.image(annotated, caption="AI Detection")
+    results = model(img)
 
-        detections = len(results.boxes)
+    plotted = results[0].plot()
 
-        decision = agent_decision(issue_type, detections)
+    st.image(plotted, caption="AI Detection")
 
-        st.subheader("🧠 Agent Decision")
-        st.json(decision)
+    detections = len(results[0].boxes)
 
-    except Exception as e:
-        st.error(f"ERROR: {e}")
+    area = 0
+    if results[0].masks:
+        for mask in results[0].masks.data:
+            area += int(mask.sum().item())
+
+    decision = agent_decision(detections, area)
+
+    st.subheader("🧠 Agent Decision")
+    st.json(decision)

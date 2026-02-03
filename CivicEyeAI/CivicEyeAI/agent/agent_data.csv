@@ -1,0 +1,6 @@
+﻿detections,area,severity,priority,cost,time
+1,120,Low,Low,1500,1
+2,240,Medium,Medium,3000,2
+3,360,High,High,4500,4
+4,480,High,High,6000,5
+5,600,High,High,7500,6
