@@ -1,33 +1,74 @@
 import pandas as pd
 import joblib
+import os
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
-import os
 
+# -----------------------------
+# Load dataset
+# -----------------------------
 data = pd.read_csv("agent/agent_data.csv")
+print("CSV Columns:", list(data.columns))
 
-X = data[["detections", "area"]]
+# -----------------------------
+# Features (INPUTS)
+# -----------------------------
+X = data[
+    ["damaged_area_m2", "road_type", "traffic_level"]
+]
 
+# One-hot encode categorical features
+X = pd.get_dummies(X)
+
+# Save feature columns for inference alignment
+os.makedirs("agent/models", exist_ok=True)
+joblib.dump(X.columns.tolist(), "agent/models/feature_columns.pkl")
+
+# -----------------------------
+# Targets (OUTPUTS)
+# -----------------------------
 le_sev = LabelEncoder()
 le_pri = LabelEncoder()
 
 y_sev = le_sev.fit_transform(data["severity"])
 y_pri = le_pri.fit_transform(data["priority"])
-y_cost = data["cost"]
-y_time = data["time"]
+y_cost = data["repair_cost_in_INR"]
+y_time = data["repair_time_days"]
 
-severity_model = RandomForestClassifier()
-priority_model = RandomForestClassifier()
-cost_model = RandomForestRegressor()
-time_model = RandomForestRegressor()
+# -----------------------------
+# Models
+# -----------------------------
+severity_model = RandomForestClassifier(
+    n_estimators=200,
+    random_state=42
+)
 
+priority_model = RandomForestClassifier(
+    n_estimators=200,
+    random_state=42
+)
+
+cost_model = RandomForestRegressor(
+    n_estimators=200,
+    random_state=42
+)
+
+time_model = RandomForestRegressor(
+    n_estimators=200,
+    random_state=42
+)
+
+# -----------------------------
+# Train
+# -----------------------------
 severity_model.fit(X, y_sev)
 priority_model.fit(X, y_pri)
 cost_model.fit(X, y_cost)
 time_model.fit(X, y_time)
 
-os.makedirs("agent/models", exist_ok=True)
-
+# -----------------------------
+# Save models & encoders
+# -----------------------------
 joblib.dump(severity_model, "agent/models/severity.pkl")
 joblib.dump(priority_model, "agent/models/priority.pkl")
 joblib.dump(cost_model, "agent/models/cost.pkl")
@@ -36,4 +77,4 @@ joblib.dump(time_model, "agent/models/time.pkl")
 joblib.dump(le_sev, "agent/models/sev_encoder.pkl")
 joblib.dump(le_pri, "agent/models/pri_encoder.pkl")
 
-print("Agent models trained successfully")
+print("✅ Agent models trained successfully with Andhra/Telangana/Delhi-style data")
