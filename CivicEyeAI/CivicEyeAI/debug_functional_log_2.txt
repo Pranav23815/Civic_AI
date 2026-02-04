@@ -1,0 +1,9 @@
+--- Functional Debugging Round 2 ---
+1. Loading YOLO model...
+✅ YOLO Loaded.
+2. creating dummy image...
+3. Running Inference...
+✅ Inference Successful. Result count: 1
+   No masks (expected for black image).
+   Pixel Area Calculation: 0
+--- Functional Debugging Round 2 Complete ---

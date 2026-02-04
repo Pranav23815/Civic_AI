@@ -1,7 +1,23 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Upload, AlertTriangle, Clock, Banknote, Activity, CheckCircle, ShieldCheck, FileText, Send } from 'lucide-react';
+import { Upload, AlertTriangle, Clock, Banknote, Activity, CheckCircle, ShieldCheck, FileText, Send, Download, Share2, MapPin, TrendingUp } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+
+// Fix Leaflet marker icon issue in React
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// Safe Leaflet Icon Fix
+const DefaultIcon = L.icon({
+    iconUrl: icon,
+    shadowUrl: iconShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
 
 function App() {
     const [selectedFile, setSelectedFile] = useState(null);
@@ -9,6 +25,10 @@ function App() {
     const [roadType, setRoadType] = useState('MainRoad');
     const [trafficLevel, setTrafficLevel] = useState('Medium');
     const [issueType, setIssueType] = useState('Pothole');
+
+    // Location State
+    const [location, setLocation] = useState({ lat: 12.9716, lon: 77.5946 }); // Default Bangalore
+    const [locStatus, setLocStatus] = useState('default'); // default, locating, found, error
 
     // Pipeline States
     const [stage, setStage] = useState('idle'); // idle, analyzing, verifying, processing, complete
@@ -18,6 +38,33 @@ function App() {
     const [workOrder, setWorkOrder] = useState(null);
     const [emailStatus, setEmailStatus] = useState(null);
     const [error, setError] = useState(null);
+
+    // Auto-Download Effect
+    useEffect(() => {
+        if (workOrder && workOrder.pdf_data) {
+            downloadPDF();
+        }
+    }, [workOrder]);
+
+    // Get Location on Mount
+    useEffect(() => {
+        if (navigator.geolocation) {
+            setLocStatus('locating');
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setLocation({
+                        lat: position.coords.latitude,
+                        lon: position.coords.longitude
+                    });
+                    setLocStatus('found');
+                },
+                (err) => {
+                    console.error("Geo Error", err);
+                    setLocStatus('error');
+                }
+            );
+        }
+    }, []);
 
     const handleFileChange = (event) => {
         const file = event.target.files[0];
@@ -60,9 +107,9 @@ function App() {
             // 2. VERIFY
             setStage('verifying');
             const verifyRes = await axios.post('http://localhost:8000/verify', {
-                vision_confidence: analyzeRes.data.vision_confidence || 0.85, // Fallback if backend doesn't send
+                vision_confidence: analyzeRes.data.vision_confidence || 0.85,
                 agent_result: analyzeRes.data,
-                location: { lat: 12.9716, lon: 77.5946 } // Mock location for demo
+                location: location // Use Real Location
             });
             setVerification(verifyRes.data);
 
@@ -85,7 +132,7 @@ function App() {
                 if (['High', 'Critical'].includes(analyzeRes.data.priority)) {
                     const woRes = await axios.post('http://localhost:8000/work-order', {
                         report_id: verifyRes.data.report_id,
-                        location: { lat: 12.9716, lon: 77.5946, address: "MG Road, Bangalore" },
+                        location: { ...location, address: "Detected via GPS" },
                         agent_decision: { ...analyzeRes.data, issue_type: issueType.toLowerCase() }
                     });
                     setWorkOrder(woRes.data);
@@ -109,6 +156,29 @@ function App() {
         }
     };
 
+    const downloadPDF = async () => {
+        if (!workOrder || !workOrder.pdf_data) return;
+        try {
+            const response = await axios.post('http://localhost:8000/generate-pdf', workOrder.pdf_data, {
+                responseType: 'blob'
+            });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `WorkOrder_${workOrder.work_order_id}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+        } catch (e) {
+            console.error("PDF Download failed", e);
+        }
+    };
+
+    const shareWhatsApp = () => {
+        if (!analysis) return;
+        const text = `🚨 *Civic-Eye Alert* 🚨\n\nIssue: ${issueType}\nPriority: ${analysis.priority}\nRisk Score: ${analysis.risk_score}/100\nLocation: https://maps.google.com/?q=${location.lat},${location.lon}\n\nView details on dashboard.`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    };
+
     // Helper for status colors
     const getRiskColor = (score) => {
         if (score >= 80) return 'text-red-600 bg-red-100 border-red-200';
@@ -116,8 +186,14 @@ function App() {
         return 'text-green-600 bg-green-100 border-green-200';
     };
 
+    // Calculate Potential Savings
+    const getSavings = (cost, risk) => {
+        if (!cost) return 0;
+        return Math.round(cost * (risk / 100) * 1.5);
+    };
+
     return (
-        <div className="min-h-screen bg-gray-50 text-slate-800 font-sans pb-10">
+        <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-10">
             {/* Header */}
             <header className="bg-slate-900 text-white py-6 shadow-md sticky top-0 z-50">
                 <div className="container mx-auto px-6 flex justify-between items-center">
@@ -128,7 +204,7 @@ function App() {
                         <p className="text-slate-400 text-xs tracking-wide uppercase mt-1">Autonomous Infrastructure Operations</p>
                     </div>
                     <div className="flex gap-4 text-xs font-mono text-slate-400">
-                        <span>v2.0-Agentic</span>
+                        <span>v2.2-LiveGPS</span>
                         <span className={stage !== 'idle' && stage !== 'complete' ? "text-blue-400 animate-pulse" : "text-green-500"}>
                             Status: {stage === 'idle' ? 'Ready' : stage === 'complete' ? 'Done' : 'Processing...'}
                         </span>
@@ -198,6 +274,32 @@ function App() {
                             {stage === 'idle' || stage === 'complete' ? 'Process Report' : 'Analyzing...'}
                         </button>
 
+                        {/* MAP WIDGET */}
+                        <div className="mt-6">
+                            <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 flex justify-between">
+                                Location Lock
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full ${locStatus === 'found' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                    {locStatus === 'found' ? 'GPS Active' : locStatus === 'locating' ? 'Locating...' : 'Default'}
+                                </span>
+                            </h3>
+                            <div className="h-48 w-full rounded-lg overflow-hidden border border-slate-200 z-0 relative flex items-center justify-center bg-slate-100">
+                                <p className="text-xs text-slate-400">Map visualization disabled (GPS still active)</p>
+                                {/* 
+                                <MapContainer key={`${location.lat}-${location.lon}`} center={[location.lat, location.lon]} zoom={15} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
+                                    <TileLayer
+                                        attribution='&copy; OpenStreetMap contributors'
+                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                    />
+                                    <Marker position={[location.lat, location.lon]}>
+                                        <Popup>
+                                            Issue Location <br /> {location.lat.toFixed(4)}, {location.lon.toFixed(4)}
+                                        </Popup>
+                                    </Marker>
+                                </MapContainer>
+                                */}
+                            </div>
+                        </div>
+
                         {error && <div className="mt-4 p-3 bg-red-50 text-red-700 text-xs rounded border border-red-200">{error}</div>}
                     </div>
                 </div>
@@ -212,7 +314,12 @@ function App() {
                                 <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
                                     <Activity className="w-4 h-4 text-blue-500" /> Civic Cortex Decision
                                 </h2>
-                                <span className="text-xs font-mono text-slate-400">conf: {(analysis.confidence_score * 100).toFixed(1)}%</span>
+                                <div className="flex gap-2">
+                                    <button onClick={shareWhatsApp} className="flex items-center gap-1 px-3 py-1 bg-green-500 hover:bg-green-600 text-white text-xs rounded transition-colors">
+                                        <Share2 className="w-3 h-3" /> Share
+                                    </button>
+                                    <span className="text-xs font-mono text-slate-400 pt-1">conf: {(analysis.confidence_score * 100).toFixed(1)}%</span>
+                                </div>
                             </div>
                             <div className="p-6">
                                 <div className="flex items-start gap-6">
@@ -242,6 +349,19 @@ function App() {
                                         <div className="p-3 bg-slate-50 rounded border border-slate-100">
                                             <div className="text-xs font-bold text-slate-600 mb-1">RECOMMENDED ACTION</div>
                                             <p className="text-sm text-slate-800">{analysis.recommended_action}</p>
+                                        </div>
+
+                                        {/* SMART INSIGHT */}
+                                        <div className="flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                                            <div className="bg-indigo-100 p-2 rounded-full">
+                                                <TrendingUp className="w-4 h-4 text-indigo-600" />
+                                            </div>
+                                            <div className="text-xs">
+                                                <span className="font-bold text-slate-700">Economic Impact: </span>
+                                                <span className="text-slate-600">
+                                                    Repairing now saves <span className="font-bold text-green-600">~₹{getSavings(analysis.estimated_cost, analysis.risk_score)}</span> compared to delaying 30 days.
+                                                </span>
+                                            </div>
                                         </div>
 
                                         <p className="text-xs text-slate-500 italic">"{analysis.decision_explanation}"</p>
@@ -326,8 +446,11 @@ function App() {
                                         </div>
                                     )}
 
-                                    <button className="w-full py-2 border border-slate-300 rounded text-slate-600 text-xs font-medium hover:bg-slate-50 transition-colors">
-                                        Download Official PDF
+                                    <button
+                                        onClick={downloadPDF}
+                                        className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded text-xs font-medium transition-colors flex justify-center items-center gap-2"
+                                    >
+                                        <Download className="w-4 h-4" /> Download Official PDF
                                     </button>
                                 </div>
                             </div>

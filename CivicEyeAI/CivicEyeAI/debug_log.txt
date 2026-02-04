@@ -1,0 +1,18 @@
+--- Debugging Startup ---
+CWD: D:\udhgam real\Civic_AI\CivicEyeAI\CivicEyeAI
+
+1. Checking YOLO model...
+✅ YOLO Model loaded.
+
+2. Checking Agent Models...
+✅ Loaded severity.pkl
+✅ Loaded priority.pkl
+✅ Loaded cost.pkl
+✅ Loaded time.pkl
+✅ Loaded sev_encoder.pkl
+✅ Loaded pri_encoder.pkl
+✅ Loaded feature_columns.pkl
+
+3. Testing imports...
+✅ Imported agent_decision
+--- Debugging Complete ---

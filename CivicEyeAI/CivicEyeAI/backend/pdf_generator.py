@@ -1,0 +1,135 @@
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+import io
+import datetime
+
+def generate_work_order_pdf(data):
+    """
+    Generates a PDF work order from the data dictionary.
+    Returns: BytesIO object containing the PDF.
+    """
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    
+    # ---------------------------------------------------------
+    # 1. HEADER & LOGO
+    # ---------------------------------------------------------
+    # Draw a top banner
+    p.setFillColor(colors.darkblue)
+    p.rect(0, height - 100, width, 100, fill=1, stroke=0)
+    
+    p.setFillColor(colors.white)
+    p.setFont("Helvetica-Bold", 24)
+    p.drawString(50, height - 50, "MUNICIPAL CORPORATION")
+    
+    p.setFont("Helvetica", 12)
+    p.drawString(50, height - 70, "INFRASTRUCTURE & ENGINEERING DIVISION")
+    
+    p.setFont("Helvetica-Bold", 14)
+    p.drawRightString(width - 50, height - 50, "OFFICE COPY")
+    
+    # ---------------------------------------------------------
+    # 2. WORK ORDER DETAILS
+    # ---------------------------------------------------------
+    y_position = height - 150
+    header_data = data.get("header", {})
+    
+    p.setFillColor(colors.black)
+    p.setFont("Helvetica-Bold", 16)
+    p.drawString(50, y_position, f"WORK ORDER: {header_data.get('order_id', 'N/A')}")
+    
+    p.setFont("Helvetica", 10)
+    p.drawRightString(width - 50, y_position, f"Date: {header_data.get('date', datetime.datetime.now().strftime('%Y-%m-%d'))}")
+    
+    y_position -= 30
+    p.line(50, y_position + 10, width - 50, y_position + 10)
+    
+    # Department Section
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(50, y_position, "ISSUING DEPARTMENT:")
+    p.setFont("Helvetica", 12)
+    p.drawString(220, y_position, header_data.get("department", "General Maintenance"))
+    
+    y_position -= 25
+    priority = "CRITICAL" if header_data.get("priority_flag") else "ROUTINE"
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(50, y_position, "PRIORITY LEVEL:")
+    
+    if priority == "CRITICAL":
+        p.setFillColor(colors.red)
+    else:
+        p.setFillColor(colors.green)
+        
+    p.drawString(220, y_position, priority)
+    p.setFillColor(colors.black)
+    
+    # ---------------------------------------------------------
+    # 3. SITE SPECIFICATIONS (Box)
+    # ---------------------------------------------------------
+    y_position -= 50
+    p.setFillColor(colors.lightgrey)
+    p.rect(50, y_position - 100, width - 100, 110, fill=1, stroke=0)
+    
+    technical = data.get("technical_specs", {})
+    location = data.get("location", {})
+    
+    p.setFillColor(colors.black)
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(70, y_position - 20, "TECHNICAL SPECIFICATIONS & SITE DATA")
+    
+    p.setFont("Helvetica", 10)
+    p.drawString(70, y_position - 45, f"Issue Found: {technical.get('issue_type', 'N/A')}")
+    p.drawString(300, y_position - 45, f"Action Code: {technical.get('action_code', 'N/A')[:30]}...")
+    
+    p.drawString(70, y_position - 65, f"Location: {location.get('lat', 0.0):.4f}, {location.get('lon', 0.0):.4f}")
+    p.drawString(300, y_position - 65, f"Addr: {location.get('address', 'N/A')}")
+    
+    p.drawString(70, y_position - 85, f"Risk Assessment Score: {technical.get('risk_score', 0)} / 100")
+    
+    # ---------------------------------------------------------
+    # 4. BUDGET & APPROVAL
+    # ---------------------------------------------------------
+    y_position -= 150
+    budget = data.get("budget", {})
+    
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(50, y_position, "BUDGET ALLOCATION")
+    p.line(50, y_position - 5, 200, y_position - 5)
+    
+    y_position -= 30
+    p.setFont("Helvetica", 12)
+    p.drawString(50, y_position, "Estimated Material Cost:")
+    p.drawRightString(width - 250, y_position, f"INR {budget.get('estimated_inr', 0)}")
+    
+    y_position -= 20
+    p.drawString(50, y_position, "Contingency Fund (10%):")
+    p.drawRightString(width - 250, y_position, f"INR {budget.get('contingency_fund', 0)}")
+    
+    y_position -= 20
+    total = budget.get('estimated_inr', 0) + budget.get('contingency_fund', 0)
+    p.setFont("Helvetica-Bold", 12)
+    p.drawString(50, y_position, "TOTAL SANCTIONED AMOUNT:")
+    p.drawRightString(width - 250, y_position, f"INR {total}")
+    
+    # ---------------------------------------------------------
+    # 5. FOOTER & WATERMARK
+    # ---------------------------------------------------------
+    p.saveState()
+    p.translate(width/2, height/2)
+    p.rotate(45)
+    p.setFillColor(colors.lightgrey)
+    p.setFont("Helvetica-Bold", 60)
+    p.drawCentredString(0, 0, "DRAFT COPY")
+    p.restoreState()
+    
+    p.setFont("Helvetica-Oblique", 8)
+    p.drawCentredString(width/2, 30, "Generated by Civic-Eye AI System | Not for Official Tendering until Signed")
+    
+    p.showPage()
+    p.save()
+    
+    buffer.seek(0)
+    return buffer

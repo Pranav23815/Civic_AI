@@ -1,0 +1,10 @@
+--- Functional Debugging ---
+✅ Imported agent_decision
+
+1. Testing Agent Decision with UI inputs...
+   Inputs: {'damaged_area_m2': 5.0, 'road_type': 'Main Road', 'traffic_level': 'Medium', 'issue_type': 'pothole'}
+✅ Agent Decision Result: {'damaged_area_m2': 5.0, 'severity': 'Low', 'priority': 'Low', 'estimated_cost': 8450, 'repair_time_days': 2, 'risk_score': 38.2, 'recommended_action': 'Monitor for expansion. No immediate action.', 'confidence_score': 0.85, 'decision_explanation': 'Risk Score 38.25/100 (Low). Automated assessment based on pothole severity and Main Road guidelines.'}
+
+2. Checking Feature Columns...
+   Feature Columns: ['damaged_area_m2', 'road_type_Highway', 'road_type_MajorRoad', 'road_type_Residential', 'road_type_Secondary', 'traffic_level_High', 'traffic_level_Low', 'traffic_level_Medium']
+--- Functional Debugging Complete ---
