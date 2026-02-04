@@ -3,6 +3,8 @@ import joblib
 import os
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, mean_absolute_error, r2_score
 
 # -----------------------------
 # Load dataset
@@ -35,6 +37,11 @@ y_pri = le_pri.fit_transform(data["priority"])
 y_cost = data["repair_cost_in_INR"]
 y_time = data["repair_time_days"]
 
+# Split data
+X_train, X_test, y_sev_train, y_sev_test, y_pri_train, y_pri_test, y_cost_train, y_cost_test, y_time_train, y_time_test = train_test_split(
+    X, y_sev, y_pri, y_cost, y_time, test_size=0.2, random_state=42
+)
+
 # -----------------------------
 # Models
 # -----------------------------
@@ -61,14 +68,33 @@ time_model = RandomForestRegressor(
 # -----------------------------
 # Train
 # -----------------------------
+severity_model.fit(X_train, y_sev_train)
+priority_model.fit(X_train, y_pri_train)
+cost_model.fit(X_train, y_cost_train)
+time_model.fit(X_train, y_time_train)
+
+# -----------------------------
+# Evaluation
+# -----------------------------
+sev_acc = accuracy_score(y_sev_test, severity_model.predict(X_test))
+pri_acc = accuracy_score(y_pri_test, priority_model.predict(X_test))
+cost_mae = mean_absolute_error(y_cost_test, cost_model.predict(X_test))
+time_mae = mean_absolute_error(y_time_test, time_model.predict(X_test))
+
+print("\n--- Model Performance ---")
+print(f"Severity Accuracy: {sev_acc:.2%}")
+print(f"Priority Accuracy: {pri_acc:.2%}")
+print(f"Cost MAE: INR {cost_mae:.2f}")
+print(f"Time MAE: {time_mae:.2f} days")
+
+# -----------------------------
+# Save models & encoders (retrain on full data for production)
+# -----------------------------
 severity_model.fit(X, y_sev)
 priority_model.fit(X, y_pri)
 cost_model.fit(X, y_cost)
 time_model.fit(X, y_time)
 
-# -----------------------------
-# Save models & encoders
-# -----------------------------
 joblib.dump(severity_model, "agent/models/severity.pkl")
 joblib.dump(priority_model, "agent/models/priority.pkl")
 joblib.dump(cost_model, "agent/models/cost.pkl")
@@ -77,4 +103,4 @@ joblib.dump(time_model, "agent/models/time.pkl")
 joblib.dump(le_sev, "agent/models/sev_encoder.pkl")
 joblib.dump(le_pri, "agent/models/pri_encoder.pkl")
 
-print("✅ Agent models trained successfully with Andhra/Telangana/Delhi-style data")
+print("\nAgent models trained and saved successfully.")
